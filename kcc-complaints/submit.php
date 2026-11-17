@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dupCheck = $pdo->prepare(
             "SELECT COUNT(*) as cnt FROM complaints
              WHERE category_id = ? AND location = ?
-             AND submitted_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+             AND submitted_at >= (CURRENT_TIMESTAMP - INTERVAL '7 days')
              AND status NOT IN ('resolved','closed')"
         );
         $dupCheck->execute([$catId, $loc]);
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              VALUES (?,?,?,?,?,?,?,'submitted',?,NOW())"
         );
         $ins->execute([$refNo, $name, $contact, $catId, $deptId,
-                       $loc, $desc, $isDup ? 1 : 0]);
+                       $loc, $desc, $isDup]);
 
         $success = true;
     }
