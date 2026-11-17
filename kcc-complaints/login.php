@@ -107,23 +107,10 @@ if (isset($_GET['error']) && $_GET['error'] === 'access_denied') {
 
     <a href="submit.php" class="btn btn-outline btn-full" style="margin-bottom:8px">Submit a complaint — no login needed</a>
     <a href="track.php"  class="btn btn-outline btn-full">Track a complaint — no login needed</a>
-
-    <div class="demo-box">
-      <h4>Demo accounts — click to fill</h4>
-      <div class="demo-row"><span>Admin</span><a href="#" onclick="fill('admin@kiambu.go.ke')">admin@kiambu.go.ke</a></div>
-      <div class="demo-row"><span>Roads Officer</span><a href="#" onclick="fill('officer1@kiambu.go.ke')">officer1@kiambu.go.ke</a></div>
-      <div class="demo-row"><span>Water Officer</span><a href="#" onclick="fill('officer2@kiambu.go.ke')">officer2@kiambu.go.ke</a></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">Password for all: <strong>Admin@1234</strong></div>
-    </div>
   </div>
 </div>
 
 <script>
-function fill(email) {
-  document.querySelector('[name=email]').value = email;
-  document.querySelector('[name=password]').value = 'Admin@1234';
-  return false;
-}
 // Load live stats
 fetch('api.php?action=stats').then(r=>r.json()).then(d=>{
   document.getElementById('totalCount').textContent    = d.total ?? '—';
