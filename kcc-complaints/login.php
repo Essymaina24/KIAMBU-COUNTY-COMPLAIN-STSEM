@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter your email and password.';
     } else {
         $pdo  = db();
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND is_active = 1 LIMIT 1");
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? AND is_active = TRUE LIMIT 1");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
