@@ -55,7 +55,7 @@ if ($filterStatus) {
     $params[] = $filterStatus;
 }
 if ($filterSearch) {
-    $where[]  = '(c.reference_no LIKE ? OR c.citizen_name LIKE ?)';
+    $where[]  = '(c.reference_no ILIKE ? OR c.citizen_name ILIKE ?)';
     $params[] = "%$filterSearch%";
     $params[] = "%$filterSearch%";
 }
@@ -76,7 +76,7 @@ $deptFilter = $user['role'] === 'officer' ? "AND c.dept_id = {$user['dept_id']}"
 $kpis = [
     'total'       => $pdo->query("SELECT COUNT(*) FROM complaints c WHERE 1=1 $deptFilter")->fetchColumn(),
     'in_progress' => $pdo->query("SELECT COUNT(*) FROM complaints c WHERE c.status='in_progress' $deptFilter")->fetchColumn(),
-    'escalated'   => $pdo->query("SELECT COUNT(*) FROM escalations e JOIN complaints c ON e.complaint_id=c.complaint_id WHERE e.resolved=0 $deptFilter")->fetchColumn(),
+    'escalated'   => $pdo->query("SELECT COUNT(*) FROM escalations e JOIN complaints c ON e.complaint_id=c.complaint_id WHERE e.resolved=FALSE $deptFilter")->fetchColumn(),
     'resolved'    => $pdo->query("SELECT COUNT(*) FROM complaints c WHERE c.status='resolved' $deptFilter")->fetchColumn(),
 ];
 
