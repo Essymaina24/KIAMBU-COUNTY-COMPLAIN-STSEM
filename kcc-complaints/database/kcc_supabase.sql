@@ -111,3 +111,12 @@ FROM (VALUES
 ) AS v(name,email,phone,password_hash,role,dept_name)
 LEFT JOIN departments d ON d.dept_name=NULLIF(v.dept_name,'')
 ON CONFLICT (email) DO NOTHING;
+
+-- The PHP backend connects server-side with the database role. Keep the
+-- public Data API from exposing complaint and staff records.
+ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE complaints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE complaint_updates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE escalations ENABLE ROW LEVEL SECURITY;
