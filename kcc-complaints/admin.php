@@ -1,119 +1,82 @@
 <?php
 require_once 'includes/db.php';
 requireRole(['admin','supervisor']);
-
 $user = currentUser();
-$pdo  = db();
+$pdo = db();
 
-// Date filters
-$from       = $_GET['from']    ?? date('Y-m-01');
-$to         = $_GET['to']      ?? date('Y-m-d');
+$from = $_GET['from'] ?? date('Y-m-01');
+$to = $_GET['to'] ?? date('Y-m-d');
 $deptFilter = (int)($_GET['dept_id'] ?? 0);
-
-$where  = ["c.submitted_at BETWEEN ? AND ?"];
-$params = [$from . ' 00:00:00', $to . ' 23:59:59'];
+$where = ["c.submitted_at >= ? AND c.submitted_at < (?::date + INTERVAL '1 day')"];
+$params = [$from . ' 00:00:00', $to];
 if ($deptFilter) { $where[] = 'c.dept_id = ?'; $params[] = $deptFilter; }
 $whereSQL = implode(' AND ', $where);
 
-// KPIs
-$kpis = [
-    'total'       => $pdo->prepare("SELECT COUNT(*) FROM complaints c WHERE $whereSQL")->execute($params) ? $pdo->prepare("SELECT COUNT(*) FROM complaints c WHERE $whereSQL")->execute($params) : 0,
-    'resolved'    => 0,
-    'in_progress' => 0,
-    'escalated'   => 0,
-];
-
-// Simpler KPI queries
-$q = $pdo->prepare("SELECT
-    COUNT(*) as total,
-    SUM(c.status='resolved') as resolved,
-    SUM(c.status='in_progress') as in_progress,
-    SUM(c.status='submitted') as submitted,
-    SUM(c.status='under_review') as under_review
+$q = $pdo->prepare("SELECT COUNT(*) AS total,
+    COUNT(*) FILTER (WHERE c.status='resolved') AS resolved,
+    COUNT(*) FILTER (WHERE c.status='in_progress') AS in_progress,
+    COUNT(*) FILTER (WHERE c.status='submitted') AS submitted,
+    COUNT(*) FILTER (WHERE c.status='under_review') AS under_review
     FROM complaints c WHERE $whereSQL");
 $q->execute($params);
 $kpis = $q->fetch();
 
-// Escalated count
 $eq = $pdo->prepare("SELECT COUNT(*) FROM escalations e
     JOIN complaints c ON e.complaint_id=c.complaint_id
-    WHERE e.resolved=0 AND $whereSQL");
+    WHERE e.resolved=FALSE AND $whereSQL");
 $eq->execute($params);
 $kpis['escalated'] = $eq->fetchColumn();
 
-// By department
-$dq = $pdo->prepare("SELECT d.dept_name,
-    COUNT(*) as total,
-    SUM(c.status='resolved') as resolved,
-    SUM(c.status='in_progress') as in_progress,
-    SUM(c.status='submitted') as submitted
-    FROM complaints c
-    JOIN departments d ON c.dept_id=d.dept_id
-    WHERE $whereSQL
-    GROUP BY d.dept_id, d.dept_name ORDER BY total DESC");
+$dq = $pdo->prepare("SELECT d.dept_name, COUNT(*) AS total,
+    COUNT(*) FILTER (WHERE c.status='resolved') AS resolved,
+    COUNT(*) FILTER (WHERE c.status='in_progress') AS in_progress,
+    COUNT(*) FILTER (WHERE c.status='submitted') AS submitted
+    FROM complaints c JOIN departments d ON c.dept_id=d.dept_id
+    WHERE $whereSQL GROUP BY d.dept_id,d.dept_name ORDER BY total DESC");
 $dq->execute($params);
 $byDept = $dq->fetchAll();
 
-// By status
-$sq = $pdo->prepare("SELECT status, COUNT(*) as cnt FROM complaints c WHERE $whereSQL GROUP BY status");
+$sq = $pdo->prepare("SELECT status,COUNT(*) AS cnt FROM complaints c WHERE $whereSQL GROUP BY status");
 $sq->execute($params);
 $byStatus = $sq->fetchAll(PDO::FETCH_KEY_PAIR);
 
-// Resolution rates
-$rq = $pdo->prepare("SELECT d.dept_name,
-    COUNT(*) as total,
-    SUM(c.status='resolved') as resolved,
-    ROUND(SUM(c.status='resolved')*100.0/COUNT(*),1) as rate,
-    ROUND(AVG(TIMESTAMPDIFF(DAY,c.submitted_at,COALESCE(c.last_updated_at,NOW()))),1) as avg_days
+$rq = $pdo->prepare("SELECT d.dept_name, COUNT(*) AS total,
+    COUNT(*) FILTER (WHERE c.status='resolved') AS resolved,
+    ROUND((COUNT(*) FILTER (WHERE c.status='resolved'))*100.0/NULLIF(COUNT(*),0),1) AS rate,
+    ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(c.last_updated_at,NOW())-c.submitted_at))/86400.0)::numeric,1) AS avg_days
     FROM complaints c JOIN departments d ON c.dept_id=d.dept_id
-    WHERE $whereSQL GROUP BY d.dept_id, d.dept_name");
+    WHERE $whereSQL GROUP BY d.dept_id,d.dept_name");
 $rq->execute($params);
 $resRates = $rq->fetchAll();
 
-// Recent escalations
-$escQ = $pdo->query("SELECT e.*, c.reference_no, c.location,
-    d.dept_name, cat.category_name,
-    u.name as supervisor_name
-    FROM escalations e
-    JOIN complaints c ON e.complaint_id=c.complaint_id
-    JOIN departments d ON c.dept_id=d.dept_id
-    JOIN categories cat ON c.category_id=cat.category_id
-    JOIN users u ON e.notified_supervisor=u.user_id
-    WHERE e.resolved=0
+$escQ = $pdo->query("SELECT e.*,c.reference_no,c.location,d.dept_name,cat.category_name,u.name AS supervisor_name
+    FROM escalations e JOIN complaints c ON e.complaint_id=c.complaint_id
+    JOIN departments d ON c.dept_id=d.dept_id JOIN categories cat ON c.category_id=cat.category_id
+    JOIN users u ON e.notified_supervisor=u.user_id WHERE e.resolved=FALSE
     ORDER BY e.escalated_at DESC LIMIT 10");
 $escalations = $escQ->fetchAll();
 
-// Duplicates log
-$dupQ = $pdo->query("SELECT c.reference_no, c.location, c.submitted_at,
-    cat.category_name, d.dept_name
-    FROM complaints c
-    JOIN categories cat ON c.category_id=cat.category_id
-    JOIN departments d ON c.dept_id=d.dept_id
-    WHERE c.is_duplicate_flag=1
+$dupQ = $pdo->query("SELECT c.reference_no,c.location,c.submitted_at,cat.category_name,d.dept_name
+    FROM complaints c JOIN categories cat ON c.category_id=cat.category_id
+    JOIN departments d ON c.dept_id=d.dept_id WHERE c.is_duplicate_flag=TRUE
     ORDER BY c.submitted_at DESC LIMIT 20");
 $duplicates = $dupQ->fetchAll();
 
-// All departments for filter
-$depts = $pdo->query("SELECT dept_id, dept_name FROM departments WHERE is_active=1")->fetchAll();
+$depts = $pdo->query("SELECT dept_id,dept_name FROM departments WHERE is_active=TRUE")->fetchAll();
 
-// CSV Export
 if (isset($_GET['export'])) {
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="kcc_complaints_' . $from . '_to_' . $to . '.csv"');
     $fp = fopen('php://output','w');
-    fputcsv($fp, ['Reference No','Citizen Name','Contact','Category','Department','Location','Status','Submitted','Last Updated']);
-    $ex = $pdo->prepare("SELECT c.reference_no, c.citizen_name, c.citizen_contact,
-        cat.category_name, d.dept_name, c.location, c.status, c.submitted_at, c.last_updated_at
-        FROM complaints c
-        JOIN categories cat ON c.category_id=cat.category_id
-        JOIN departments d ON c.dept_id=d.dept_id
+    fputcsv($fp,['Reference No','Citizen Name','Contact','Category','Department','Location','Status','Submitted','Last Updated']);
+    $ex = $pdo->prepare("SELECT c.reference_no,c.citizen_name,c.citizen_contact,cat.category_name,d.dept_name,
+        c.location,c.status,c.submitted_at,c.last_updated_at FROM complaints c
+        JOIN categories cat ON c.category_id=cat.category_id JOIN departments d ON c.dept_id=d.dept_id
         WHERE $whereSQL ORDER BY c.submitted_at DESC");
     $ex->execute($params);
-    while ($row = $ex->fetch()) fputcsv($fp, $row);
-    fclose($fp);
-    exit;
+    while ($row=$ex->fetch()) fputcsv($fp,$row);
+    fclose($fp); exit;
 }
-
 $initials = strtoupper(substr($user['name'],0,1) . (strpos($user['name'],' ')!==false ? substr($user['name'],strpos($user['name'],' ')+1,1) : ''));
 ?>
 <!DOCTYPE html>
