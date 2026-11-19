@@ -44,11 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Save complaint
         $ins = $pdo->prepare(
             "INSERT INTO complaints
-             (reference_no, citizen_name, citizen_contact, category_id, dept_id,
+             (reference_no, citizen_id, citizen_name, citizen_contact, category_id, dept_id,
               location, description, status, is_duplicate_flag, submitted_at)
-             VALUES (?,?,?,?,?,?,?,'submitted',?::boolean,NOW())"
+             VALUES (?,?,?,?,?,?,?,?,'submitted',?::boolean,NOW())"
         );
-        $ins->execute([$refNo, $name, $contact, $catId, $deptId,
+        $citizenId = (currentUser()['role'] ?? '') === 'citizen' ? currentUser()['user_id'] : null;
+        $ins->execute([$refNo, $citizenId, $name, $contact, $catId, $deptId,
                        $loc, $desc, ($isDup ? 'true' : 'false')]);
 
         $success = true;
