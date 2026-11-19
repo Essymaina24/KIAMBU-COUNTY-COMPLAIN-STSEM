@@ -12,8 +12,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $emailValue = $email;
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Enter a valid email address.';
-    } elseif (strlen($password) < 8) {
-        $error = 'Password must be at least 8 characters.';
+    } elseif (strlen($password) < 12
+        || !preg_match('/[A-Z]/', $password)
+        || !preg_match('/[a-z]/', $password)
+        || !preg_match('/[0-9]/', $password)
+        || !preg_match('/[^A-Za-z0-9]/', $password)) {
+        $error = 'Use at least 12 characters, including uppercase and lowercase letters, a number, and a special character.';
     } elseif (strlen($password) > 200) {
         $error = 'Password is too long.';
     } else {
@@ -56,6 +60,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 <form method="POST" action="signup.php" autocomplete="on">
 <div class="login-field"><label>Email address</label><input type="email" name="email" value="<?= e($emailValue) ?>" placeholder="you@example.com" autocomplete="email" required maxlength="150"></div>
-<div class="login-field"><label>Password</label><input type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required minlength="8" maxlength="200"></div>
+<div class="login-field">
+<label for="password">Create a strong password</label>
+<div style="position:relative">
+<input id="password" type="password" name="password" placeholder="Create a strong password" autocomplete="new-password" required minlength="12" maxlength="200" aria-describedby="password-rules" style="padding-right:76px">
+<button type="button" id="toggle-password" aria-label="Show password" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#24518a;cursor:pointer;font-weight:600">Show</button>
+</div>
+<div id="password-rules" style="font-size:12px;line-height:1.8;margin-top:8px;color:#64748b">
+<div id="rule-length">○ At least 12 characters</div>
+<div id="rule-upper">○ One uppercase letter (A–Z)</div>
+<div id="rule-lower">○ One lowercase letter (a–z)</div>
+<div id="rule-number">○ One number (0–9)</div>
+<div id="rule-symbol">○ One special character (e.g. !@#$%)</div>
+</div>
+<div style="height:6px;background:#e2e8f0;border-radius:99px;margin-top:8px;overflow:hidden"><div id="password-strength" style="height:100%;width:0;background:#dc2626;transition:width .2s"></div></div>
+<div id="strength-label" aria-live="polite" style="font-size:12px;margin-top:4px;color:#64748b">Password strength: not entered</div>
+</div>
 <button type="submit" class="btn btn-primary btn-full" style="margin-top:6px">Sign up</button></form>
-<div class="divider">Already have an account?</div><a href="login.php" class="btn btn-outline btn-full">Sign in</a></div></div></body></html>
+<div class="divider">Already have an account?</div><a href="login.php" class="btn btn-outline btn-full">Sign in</a></div></div>
+<script>
+(function () {
+  const input = document.getElementById('password');
+  const toggle = document.getElementById('toggle-password');
+  const bar = document.getElementById('password-strength');
+  const label = document.getElementById('strength-label');
+  const rules = {
+    length: value => value.length >= 12,
+    upper: value => /[A-Z]/.test(value),
+    lower: value => /[a-z]/.test(value),
+    number: value => /[0-9]/.test(value),
+    symbol: value => /[^A-Za-z0-9]/.test(value)
+  };
+  const ids = {length:'rule-length',upper:'rule-upper',lower:'rule-lower',number:'rule-number',symbol:'rule-symbol'};
+  input.addEventListener('input', function () {
+    const value = input.value;
+    let passed = 0;
+    Object.entries(rules).forEach(([key, test]) => {
+      const ok = test(value);
+      if (ok) passed++;
+      const el = document.getElementById(ids[key]);
+      el.textContent = (ok ? '✓ ' : '○ ') + el.textContent.replace(/^[✓○] /, '');
+      el.style.color = ok ? '#15803d' : '#64748b';
+    });
+    bar.style.width = (passed * 20) + '%';
+    const names = ['Very weak','Weak','Fair','Good','Strong','Strong'];
+    label.textContent = 'Password strength: ' + (value ? names[passed] : 'not entered');
+    label.style.color = passed === 5 ? '#15803d' : '#64748b';
+  });
+  toggle.addEventListener('click', function () {
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    toggle.textContent = show ? 'Hide' : 'Show';
+    toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  });
+})();
+</script>
+</body></html>
