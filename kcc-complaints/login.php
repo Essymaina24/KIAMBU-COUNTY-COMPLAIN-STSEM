@@ -3,7 +3,7 @@ require_once 'includes/db.php';
 
 if (isLoggedIn()) {
     $user = currentUser();
-    redirect(in_array($user['role'], ['admin','supervisor']) ? 'admin.php' : 'officer.php');
+    redirect($user['role'] === 'citizen' ? 'my-complaints.php' : (in_array($user['role'], ['admin','supervisor']) ? 'admin.php' : 'officer.php'));
 }
 
 $error = '';
@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $stmt->fetch();
 
         if ($user && password_verify($pwd, $user['password_hash'])) {
+            session_regenerate_id(true);
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['user']    = [
                 'user_id'  => $user['user_id'],
@@ -29,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role'     => $user['role'],
                 'dept_id'  => $user['dept_id'],
             ];
-            redirect(in_array($user['role'], ['admin','supervisor']) ? 'admin.php' : 'officer.php');
+            redirect($user['role'] === 'citizen' ? 'my-complaints.php' : (in_array($user['role'], ['admin','supervisor']) ? 'admin.php' : 'officer.php'));
         } else {
             $error = 'Invalid email or password.';
         }
@@ -45,7 +46,7 @@ if (isset($_GET['error']) && $_GET['error'] === 'access_denied') {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login — KCC Complaint System</title>
+<title>Sign in — KCC Complaint System</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
@@ -83,8 +84,8 @@ if (isset($_GET['error']) && $_GET['error'] === 'access_denied') {
 
   <!-- Right panel -->
   <div class="login-right">
-    <h1>Staff login</h1>
-    <p class="sub">Sign in to access your department dashboard.</p>
+    <h1>Sign in</h1>
+    <p class="sub">Access your citizen account or staff dashboard.</p>
 
     <?php if ($error): ?>
       <div class="alert alert-error"><?= e($error) ?></div>
@@ -94,7 +95,7 @@ if (isset($_GET['error']) && $_GET['error'] === 'access_denied') {
       <div class="login-field">
         <label>Email address</label>
         <input type="email" name="email" value="<?= e($_POST['email'] ?? '') ?>"
-               placeholder="officer@kiambu.go.ke" autocomplete="email" required>
+               placeholder="you@example.com" autocomplete="email" required>
       </div>
       <div class="login-field">
         <label>Password</label>
@@ -103,9 +104,10 @@ if (isset($_GET['error']) && $_GET['error'] === 'access_denied') {
       <button type="submit" class="btn btn-primary btn-full" style="margin-top:6px">Sign in</button>
     </form>
 
-    <div class="divider">or</div>
+    <div class="divider">New to the system?</div>
+    <a href="signup.php" class="btn btn-primary btn-full" style="margin-bottom:8px">Create an account</a>
 
-    <a href="submit.php" class="btn btn-outline btn-full" style="margin-bottom:8px">Submit a complaint — no login needed</a>
+    <a href="submit.php" class="btn btn-outline btn-full" style="margin-bottom:8px">Submit a complaint without an account</a>
     <a href="track.php"  class="btn btn-outline btn-full">Track a complaint — no login needed</a>
   </div>
 </div>
