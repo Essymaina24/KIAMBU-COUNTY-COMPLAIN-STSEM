@@ -6,6 +6,18 @@
 :80 {
     root * /app
     encode zstd br gzip
+
+    # Only public, version-tolerant static assets are cacheable.
+    @static_assets path /assets/*
+    header @static_assets Cache-Control "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
+
+    # PHP pages can contain complaint details and authenticated data.
+    # Never let shared browsers/CDNs cache these responses.
+    @php_pages path *.php /
+    header @php_pages Cache-Control "private, no-store, no-cache, must-revalidate"
+    header @php_pages Pragma "no-cache"
+    header @php_pages X-Content-Type-Options "nosniff"
+
     php_server
     file_server
 }
